@@ -13,7 +13,7 @@ tiles = {
 #    'floor' : pygame.image.load('floor.png'),
     'destructible' : pygame.image.load('brick.png'),
     'undestructible' : pygame.image.load('iron.png'),
-#    'water' : pygame.image.load('water.png'),
+    'water' : pygame.image.load('water.png'),
     'motherBase' : pygame.image.load('base.png')
 }
 
@@ -88,7 +88,7 @@ class Destroyable(Tile):
 
 class Water(Tile):
     def __init__(self, coords, image) -> None:
-        super().__init__(coords, image, self)
+        super().__init__(coords, tiles['water'], self)
     
 class MotherBase(Tile):
     def __init__(self, coords, image) -> None:
