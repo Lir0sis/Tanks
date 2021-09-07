@@ -21,7 +21,7 @@ class Player:
         elif keys[pygame.K_d]:
             self.direction = [1.0, 0.0]
             keypressed = True
-
+            
         if keys[pygame.K_SPACE]:
             self.child.action()
         self.child.setDirection(self.direction, keypressed)

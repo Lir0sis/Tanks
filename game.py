@@ -71,6 +71,7 @@ class Game:
         self.player = Player(Tank('./OriginalTank.png'))
         gameLayer.append(self.player.child.rect)
         impassableLayer.append(self.player.child.rect)
+        
 
     def run(self):
         for i in pygame.event.get():
@@ -85,9 +86,6 @@ class Game:
             i.update()
         for i in drawable:
             self.screen.drawSprite(i)
-        
-        
-
 
         utils.time += 1 / utils.FPS
 
@@ -100,8 +98,4 @@ class Game:
 game = Game()
 
 while 1:
-    # point = pygame.mouse.get_pos()
-
-    # pygame.draw.circle(game.screen.getScreen(), utils.ORANGE, game.screen.getSize(), 20) 
     game.run()
-    # pygame.draw.circle(sc, utils.RED, point, 2)

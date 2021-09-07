@@ -9,13 +9,13 @@ drawable = []
 gameLayer = []
 impassableLayer = []
 
-# tiles = {
-#     'floor' : pygame.image.load('floor.png'),
-#     'destructible' : pygame.image.load('brick.png'),
-#     'undestructible' : pygame.image.load('iron.png'),
-#     'water' : pygame.image.load('water.png'),
-#     'motherBase' : pygame.image.load('base.png')
-# }
+tiles = {
+#    'floor' : pygame.image.load('floor.png'),
+    'destructible' : pygame.image.load('brick.png'),
+    'undestructible' : pygame.image.load('iron.png'),
+#    'water' : pygame.image.load('water.png'),
+    'motherBase' : pygame.image.load('base.png')
+}
 
 class Transform:
     def __init__(self, x, y):
@@ -43,10 +43,11 @@ class MyRect(pygame.Rect):
         self.parent = parent
 
 class Tile:
-    def __init__(self, coords, color, parent, tileSize = 1) -> None:
+    def __init__(self, coords, image, parent, tileSize = 1) -> None:
         self.size = (1,1)
         self.x, self.y = coords 
-        self.image = utils.createSimpleSprite(color, tileSize)
+        # self.image = utils.createSimpleSprite(color, tileSize)
+        self.image = utils.duplicateImage(tileSize, image)
         self._createRect(tileSize, parent)
 
     def getPos(self):
@@ -58,7 +59,7 @@ class Tile:
 
     def getCentralPos(self):
         centerOffset = utils.MAP_UNIT_SCALE/2
-        #x, y = utils.screenScaleXY((self.x, self.y))
+        # x, y = utils.screenScaleXY((self.x, self.y))
         x = self.x * utils.MAP_UNIT_SCALE
         y = self.y * utils.MAP_UNIT_SCALE
         x += centerOffset * self.size[0]
@@ -73,12 +74,12 @@ class Tile:
 
 class Undestroyable(Tile):
     def __init__(self, coords, image) -> None:
-        super().__init__(coords, image, self)
+        super().__init__(coords, tiles['undestructible'], self)
     
 
 class Destroyable(Tile):
     def __init__(self, coords, image) -> None:
-        super().__init__(coords, image, self)
+        super().__init__(coords, tiles['destructible'], self)
 
     def kill(self):
         gameLayer.remove(self)
@@ -91,7 +92,7 @@ class Water(Tile):
     
 class MotherBase(Tile):
     def __init__(self, coords, image) -> None:
-        super().__init__(coords, image, self, 3)
+        super().__init__(coords, tiles['motherBase'], self, 3)
         
     def kill(self):
         gameLayer.remove(self)
