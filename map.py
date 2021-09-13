@@ -306,6 +306,11 @@ class Projectile(Transform):
 
     def update(self):
         if self.enabled:
+
+            if self.lifetime <= 0:
+                self.kill()
+                return
+
             indx = self.rect.collidelist(gameLayer)
             if indx != -1:
                 self.onCollide(gameLayer[indx])
@@ -315,8 +320,8 @@ class Projectile(Transform):
             self.rect.center = [math.floor(self.x) + utils.OFFSET_X, math.floor(self.y) + utils.OFFSET_Y]
 
             self.lifetime -= 1.0/utils.FPS
-            if self.lifetime <= 0:
-                self.kill()
+
+            
             
 class SpawnPoint:
     def __init__(self, enemy, coords) -> None:
