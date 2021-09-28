@@ -4,6 +4,7 @@ import math
 import utils
 import sys
 import game
+import queue
 
 updateable = []
 drawable = []
@@ -144,7 +145,7 @@ class Tank(Transform, Impassable):
         self.fireProj = ProjEmitter(Projectile, './bullet.png', self)
         self.image = pygame.transform.rotate(pygame.image.load(image), -90)
         self.rect = MyRect(self, self.image.get_rect())
-        self.size = (2, 2)
+        self.size = (1, 1)
         self.resize(None)
 
         self.direction = [0.0, -1.0]
@@ -223,9 +224,9 @@ class Tank(Transform, Impassable):
         # print(x1, x2)
         diffx = x1-x2 - self.velocity[0] * 1/utils.FPS
         diffy = y1-y2 - self.velocity[1] * 1/utils.FPS
-        
-        signx = diffx/abs(diffx)
-        signy = diffy/abs(diffy)
+        print(diffx, diffy)
+        signx = diffx/abs(diffx) if diffx else 0
+        signy = diffy/abs(diffy) if diffy else 0
 
         if abs(diffx) < w1/2 + w2/2:
             if diffx < 0 and self.velocity[0] < 0 \
@@ -248,7 +249,7 @@ class Tank(Transform, Impassable):
         if vel[0] != 0 or vel[1] != 0: 
             self.rotate()
 
-        if indx is not -1:
+        if indx != -1:
             self.onCollide(impassableLayer[indx])
 
         self.setPos(self.x + vel[0] / utils.FPS, self.y + vel[1] / utils.FPS)
@@ -287,7 +288,7 @@ class Projectile(Transform):
         self.damage = 1
         self.penetration = 1
         self.speed = 30
-        self.size = (1, 1.5)
+        self.size = (0.5, 0.75)
         
         self.enabled = True
 
@@ -455,6 +456,26 @@ class Map:
                     
         return neighbors
 
+    def getCostlyNeighbors(self, item):
+        cost, pos = item
+        x, y = pos
+        neighbors = []
+        for dx, dy in [[0, -1], [0, 1], [-1, 0], [1, 0]]:
+            cell = self.mapMatrix[y + dy][x + dx]
+
+            if cell == []:
+                neighbors.append((cost + 1, (dx + x, dy + y)))
+            else:
+                for obj in cell:
+                    if isinstance(obj, Destroyable):
+                        neighbors.append((cost + 1/0.95, (dx + x, dy + y)))
+                        break
+                    elif not isinstance(obj, Impassable):
+                        neighbors.append((cost + 1, (dx + x, dy + y)))
+                        break
+                    
+        return neighbors
+
     def bfs(self, start_pos, end_pos):
 
         parent = {start_pos: None}
@@ -481,24 +502,24 @@ class Map:
     def uniformCostSearch(self, start_pos, end_pos):
 
         parent = {start_pos: None}
-        to_visit = [start_pos]
-        while to_visit:
-            pos = to_visit.pop(0)
+        to_visit = queue.PriorityQueue()
+        to_visit.put((1, start_pos))
+        while not to_visit.empty():
+            item = to_visit.get()
+            _ , pos = item
             if pos == end_pos:
                 break
             else:
-                neighbors = self.getNeighbors(pos)
-                for neighbor in neighbors:
-                    if neighbor not in parent:
-                        parent[neighbor] = pos
-                        to_visit.append(neighbor)
+                for cost, next_pos in self.getCostlyNeighbors(item):
+                    if next_pos not in parent:
+                        parent[next_pos] = pos
+                        to_visit.put((cost, next_pos))
         path = []
         pos = end_pos
         while pos in parent:
             path.append(pos)
             pos = parent[pos]
         path.reverse()
-
         return path
 
     def dfs(self, start_pos, end_pos):

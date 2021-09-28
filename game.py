@@ -38,13 +38,13 @@ class Screen:
     def drawLines(self, vertices):
         start_pos = vertices[0]
         scale = utils.WINDOW_SCALE * utils.MAP_UNIT_SCALE
-        offset = utils.MAP_UNIT_SCALE / 2
+        offset = 0.5
         for end_pos in vertices:
             x1, y1 = end_pos
             x2, y2 = start_pos
             pygame.draw.line(self._screen, utils.RED, 
-                (x1 * scale + utils.OFFSET_X + offset, y1 * scale + utils.OFFSET_Y + offset), 
-                (x2 * scale + utils.OFFSET_X + offset, y2 * scale + utils.OFFSET_Y + offset), width=1)
+                ((x1 + offset) * scale + utils.OFFSET_X, (y1 + offset) * scale + utils.OFFSET_Y), 
+                ((x2 + offset) * scale + utils.OFFSET_X, (y2 + offset) * scale + utils.OFFSET_Y), width=1)
             start_pos = end_pos
 
     def fill(self, color):
@@ -121,7 +121,7 @@ class Game:
         #  round(self.player.child.y * scale) + utils.OFFSET_Y + scale * utils.MAP_UNIT_SCALE/2), 5 * scale, 3)
 
         start = time.time()
-        path = self.map.dfs(self.player.child.getMatrixPos(), (4,3))
+        path = self.map.uniformCostSearch(self.player.child.getMatrixPos(), (4, 3))
         end = time.time()
         if len(timelist) >= 30:
             avg = sum(timelist) / len(timelist)

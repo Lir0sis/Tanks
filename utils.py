@@ -14,7 +14,7 @@ OFFSET_Y = 0
 OFFSET_X = 0
 MAP_UNIT_SCALE = 10
 WINDOW_SCALE = 1
-MATRIX_CENTER_BORDER = 0.35
+MATRIX_CENTER_BORDER = 0.45
 FPS = 120
 
 time = 0.0
@@ -40,7 +40,7 @@ def screenScaleXY(xy):
 
 
 def getMatrixCoord(coord):
-    m_coord = math.floor(coord / MAP_UNIT_SCALE)
+    m_coord = round(coord / MAP_UNIT_SCALE)
     if m_coord + MATRIX_CENTER_BORDER < coord / MAP_UNIT_SCALE or \
     m_coord + 1 - MATRIX_CENTER_BORDER > coord / MAP_UNIT_SCALE:
         return m_coord
