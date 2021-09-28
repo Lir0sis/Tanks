@@ -103,7 +103,7 @@ class Game:
 
         self.clock.tick(utils.FPS)
         
-        self.screen.fill((0, 170, 221))
+        self.screen.fill(utils.BLACK)
 
         for i in map.updateable:
             i.update()
@@ -121,7 +121,7 @@ class Game:
         #  round(self.player.child.y * scale) + utils.OFFSET_Y + scale * utils.MAP_UNIT_SCALE/2), 5 * scale, 3)
 
         start = time.time()
-        path = self.map.bfs(self.player.child.getMatrixPos(), (4,3))
+        path = self.map.dfs(self.player.child.getMatrixPos(), (4,3))
         end = time.time()
         if len(timelist) >= 30:
             avg = sum(timelist) / len(timelist)

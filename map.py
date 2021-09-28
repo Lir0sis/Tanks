@@ -478,6 +478,29 @@ class Map:
 
         return path
 
+    def uniformCostSearch(self, start_pos, end_pos):
+
+        parent = {start_pos: None}
+        to_visit = [start_pos]
+        while to_visit:
+            pos = to_visit.pop(0)
+            if pos == end_pos:
+                break
+            else:
+                neighbors = self.getNeighbors(pos)
+                for neighbor in neighbors:
+                    if neighbor not in parent:
+                        parent[neighbor] = pos
+                        to_visit.append(neighbor)
+        path = []
+        pos = end_pos
+        while pos in parent:
+            path.append(pos)
+            pos = parent[pos]
+        path.reverse()
+
+        return path
+
     def dfs(self, start_pos, end_pos):
 
         parent = {start_pos: None}
