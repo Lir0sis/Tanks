@@ -4,7 +4,6 @@ import math
 import utils
 import sys
 import game
-import queue
 
 updateable = []
 drawable = []
@@ -66,12 +65,12 @@ class Transform:
         self.m_y = nm_y
 
 class MyRect(pygame.Rect):
-    def __init__(self, parent, object = None,sizes = None):
-        if object is None and sizes is not None:
+    def __init__(self, parent, tileect = None,sizes = None):
+        if tileect is None and sizes is not None:
             left, top, width, height = sizes
             super().__init__((left, top), (width, height))
-        elif object is not None and sizes is None:
-            super().__init__(object)
+        elif tileect is not None and sizes is None:
+            super().__init__(tileect)
         self.parent = parent
 
 class Tile(Transform):
@@ -213,13 +212,13 @@ class Tank(Transform, Impassable):
     def onCollide(self, collider):
         if collider.parent == self:
             return
-        obj = collider.parent
-        # # print(type(obj))
-        x1, y1 = obj.getCenterPos()
+        tile = collider.parent
+        # # print(type(tile))
+        x1, y1 = tile.getCenterPos()
         x2, y2 = self.getCenterPos()
         # # print(x, y)
         w1, h1 = self.getSize()
-        w2, h2 = obj.getSize()
+        w2, h2 = tile.getSize()
         
         # print(x1, x2)
         diffx = x1-x2 - self.velocity[0] * 1/utils.FPS
@@ -298,18 +297,18 @@ class Projectile(Transform):
         return id(self) == id(other)
 
     def onCollide(self, collider):
-        obj = collider.parent
-        if obj == self.parent:
+        tile = collider.parent
+        if tile == self.parent:
             return
-        objType = type(obj)
-        if objType is Undestroyable:
+        tileType = type(tile)
+        if tileType is Undestroyable:
             pass
-        elif objType is Destroyable:
-            obj.kill()
-        elif objType is Tank:
-            obj.kill()
-        elif objType is MotherBase:
-            obj.kill()
+        elif tileType is Destroyable:
+            tile.kill()
+        elif tileType is Tank:
+            tile.kill()
+        elif tileType is MotherBase:
+            tile.kill()
         self.kill()
         return True
 
@@ -372,7 +371,7 @@ class SpawnPoint:
         self.x, self.y = coords
     
 class Map:
-    def __init__(self, mapfile = 'simple.lay'):
+    def __init__(self, isMaze = True, mapfile = 'simple.lay', ):
         
         # TODO 
         # карта состоит из кубиков, 1 кубик 1/4 танка. 
@@ -381,19 +380,52 @@ class Map:
 
         self.playerSpawnPoints = []
         self.enemySpawnPoints = []
-
+        
+        self.isMaze = isMaze
         self._rawMap = open('./maps/' + mapfile, 'r').read()
         self.mapMatrix = []
 
     def _getBoardSize(self):
+        scale = utils.MAP_UNIT_SCALE
+        if self.isMaze:
+            return utils.MAZE_X * scale, utils.MAZE_Y * scale
         rows = self._rawMap.split('\n')
         y = len(rows)
         x = len(rows[0])
 
-        return (x * utils.MAP_UNIT_SCALE, y * utils.MAP_UNIT_SCALE)
+        return (x * scale, y * scale)
+
+    def _initLayers(self):
+        drawableList = []
+        for j, row in enumerate(self.mapMatrix):
+            for i, col in enumerate(row):
+                for tile in col:
+                    if isinstance(tile, Undestroyable):
+                        gameLayer.append(tile.rect)
+                        impassableLayer.append(tile.rect)
+                        drawableList.append(tile)
+                    elif isinstance(tile, Destroyable):
+                        gameLayer.append(tile.rect)
+                        impassableLayer.append(tile.rect)
+                        drawableList.append(tile)
+                    elif isinstance(tile, Water):
+                        impassableLayer.append(tile.rect)
+                        drawableList.append(tile)
+                    elif isinstance(tile, SpawnPoint) and tile.enemy:
+                        self.enemySpawnPoints.append(tile)
+                    elif isinstance(tile, SpawnPoint) and not tile.enemy:
+                        self.playerSpawnPoints.append(tile)
+                    elif isinstance(tile, MotherBase):
+                        gameLayer.append(tile.rect)
+                        drawableList.append(tile)
+        global drawable 
+        drawable += drawableList
 
     def init(self):
-        drawableList = []
+        if self.isMaze:
+            self.mapMatrix = utils.make_maze()
+            self._initLayers()
+            return
         rows = self._rawMap.split('\n')
 
         for j, row in enumerate(rows):
@@ -401,148 +433,25 @@ class Map:
             for i, c in enumerate(row):
                 if c == 'X':
                     tile = Undestroyable((i, j), utils.WHITE)
-                    gameLayer.append(tile.rect)
-                    impassableLayer.append(tile.rect)
-                    drawableList.append(tile)
-
                     self.mapMatrix[j].append([tile])
                 elif c == 'O':
                     self.mapMatrix[j].append([])
                 elif c == 'D':
                     tile = Destroyable((i, j), utils.ORANGE)
-                    gameLayer.append(tile.rect)
-                    impassableLayer.append(tile.rect)
-                    drawableList.append(tile)
-
                     self.mapMatrix[j].append([tile])
                 elif c == 'W':
                     tile = Water((i, j), utils.BLUE)
-                    impassableLayer.append(tile.rect)
-                    drawableList.append(tile)
-
                     self.mapMatrix[j].append([tile])
                 elif c == 'E':
                     tile = SpawnPoint(True,(i, j))
-                    self.enemySpawnPoints.append(tile)
-
                     self.mapMatrix[j].append([])
                 elif c == 'P':
                     tile = SpawnPoint(False,(i, j))
-                    self.playerSpawnPoints.append(tile)
                     self.mapMatrix[j].append([])
                 elif c == 'M':
                     tile = MotherBase((i - 1, j - 1), utils.GREY)
-                    gameLayer.append(tile.rect)
-                    drawableList.append(tile)
-
                     self.mapMatrix[j].append([tile])
-        # # print(self.mapMatrix)
-        # # print(tempList)
-        global drawable 
-        drawable += drawableList
 
-    def getNeighbors(self, pos):
-        x, y = pos
-        neighbors = []
-        for dx, dy in [[0, -1], [0, 1], [-1, 0], [1, 0]]:
-            cell = self.mapMatrix[y + dy][x + dx]
+        self._initLayers()
 
-            if cell == []:
-                neighbors.append((dx + x, dy + y))
-            else:
-                for obj in cell:
-                    if not isinstance(obj, Impassable):
-                        neighbors.append((dx + x, dy + y))
-                    
-        return neighbors
-
-    def getCostlyNeighbors(self, item):
-        cost, pos = item
-        x, y = pos
-        neighbors = []
-        for dx, dy in [[0, -1], [0, 1], [-1, 0], [1, 0]]:
-            cell = self.mapMatrix[y + dy][x + dx]
-
-            if cell == []:
-                neighbors.append((cost + 1, (dx + x, dy + y)))
-            else:
-                for obj in cell:
-                    if isinstance(obj, Destroyable):
-                        neighbors.append((cost + 1/0.95, (dx + x, dy + y)))
-                        break
-                    elif not isinstance(obj, Impassable):
-                        neighbors.append((cost + 1, (dx + x, dy + y)))
-                        break
-                    
-        return neighbors
-
-    def bfs(self, start_pos, end_pos):
-
-        parent = {start_pos: None}
-        to_visit = [start_pos]
-        while to_visit:
-            pos = to_visit.pop(0)
-            if pos == end_pos:
-                break
-            else:
-                neighbors = self.getNeighbors(pos)
-                for neighbor in neighbors:
-                    if neighbor not in parent:
-                        parent[neighbor] = pos
-                        to_visit.append(neighbor)
-        path = []
-        pos = end_pos
-        while pos in parent:
-            path.append(pos)
-            pos = parent[pos]
-        path.reverse()
-
-        return path
-
-    def uniformCostSearch(self, start_pos, end_pos):
-
-        parent = {start_pos: None}
-        to_visit = queue.PriorityQueue()
-        to_visit.put((1, start_pos))
-        while not to_visit.empty():
-            item = to_visit.get()
-            _ , pos = item
-            if pos == end_pos:
-                break
-            else:
-                for cost, next_pos in self.getCostlyNeighbors(item):
-                    if next_pos not in parent:
-                        parent[next_pos] = pos
-                        to_visit.put((cost, next_pos))
-        path = []
-        pos = end_pos
-        while pos in parent:
-            path.append(pos)
-            pos = parent[pos]
-        path.reverse()
-        return path
-
-    def dfs(self, start_pos, end_pos):
-
-        parent = {start_pos: None}
-        to_visit = [start_pos]
-        while to_visit:
-            pos = to_visit.pop(-1)
-            if pos == end_pos:
-                break
-            else:
-                neighbors = self.getNeighbors(pos)
-                for neighbor in neighbors:
-                    if neighbor not in parent:
-                        parent[neighbor] = pos
-                        to_visit.append(neighbor)
-        path = []
-        pos = end_pos
-        while pos in parent:
-            path.append(pos)
-            pos = parent[pos]
-        path.reverse()
-
-        return path
-
-
+    

@@ -2,7 +2,7 @@ import game
 
 # class Test:
 #     def __init__(self):
-#         self.test1 = 'sampleText'
+#         self.test1 = 'sampleText'ііііііііііі
 
 
 
@@ -16,4 +16,5 @@ if __name__ == '__main__':
     gameInst = game.Game.getInstance()
 
     while True:
+        
         gameInst.run()

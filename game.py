@@ -36,6 +36,8 @@ class Screen:
         self._screen.blit(obj.image, obj.rect)
 
     def drawLines(self, vertices):
+        if not vertices:
+            return
         start_pos = vertices[0]
         scale = utils.WINDOW_SCALE * utils.MAP_UNIT_SCALE
         offset = 0.5
@@ -121,14 +123,14 @@ class Game:
         #  round(self.player.child.y * scale) + utils.OFFSET_Y + scale * utils.MAP_UNIT_SCALE/2), 5 * scale, 3)
 
         start = time.time()
-        path = self.map.uniformCostSearch(self.player.child.getMatrixPos(), (4, 3))
+        #path = utils.starA(self.player.child.getMatrixPos(), (4, 3), self.map.mapMatrix)
         end = time.time()
         if len(timelist) >= 30:
             avg = sum(timelist) / len(timelist)
             timelist.pop(0)
             timelist[0] = avg
-            print(avg)
+            #print(avg)
         timelist.append(end-start)
         
-        self.screen.drawLines(path)
+        #self.screen.drawLines(path)
         self.screen.update()
