@@ -1,3 +1,4 @@
+import random
 import pygame
 import sys
 import map
@@ -42,12 +43,24 @@ class Screen:
         scale = utils.WINDOW_SCALE * utils.MAP_UNIT_SCALE
         offset = 0.5
         for end_pos in vertices:
-            x1, y1 = end_pos
+            x, y = end_pos
             x2, y2 = start_pos
             pygame.draw.line(self._screen, utils.RED, 
-                ((x1 + offset) * scale + utils.OFFSET_X, (y1 + offset) * scale + utils.OFFSET_Y), 
+                ((x + offset) * scale + utils.OFFSET_X, (y + offset) * scale + utils.OFFSET_Y), 
                 ((x2 + offset) * scale + utils.OFFSET_X, (y2 + offset) * scale + utils.OFFSET_Y), width=1)
             start_pos = end_pos
+
+    def drawPoints(self, vertices):
+        if not vertices:
+            return
+        scale = utils.MAP_UNIT_SCALE * utils.WINDOW_SCALE
+        radius = 0.5
+        
+        for pos in vertices:
+            x, y = pos
+            pygame.draw.circle(self._screen,utils.RED, 
+            (x * scale + utils.OFFSET_X, y * scale + utils.OFFSET_Y), 
+            radius * scale)
 
     def fill(self, color):
         self._screen.fill(color)
@@ -71,26 +84,28 @@ class Screen:
         self.rect.centery += self.direction[1] * self.speed / FPS
         # print(self.rect.center)
 '''
-
 class Game:
     __instance = None
+   
     def __init__(self):
         self.clock = pygame.time.Clock()
         self.screen = Screen()
         self.map = map.Map()
+        self.path = []
 
         boardWidth, boardHeight = self.map._getBoardSize()
         utils.WINDOW_SCALE = self.screen.getScale((boardWidth, boardHeight))
         self.screen.setOffset((boardWidth * utils.WINDOW_SCALE, boardHeight * utils.WINDOW_SCALE))
 
         self.map.init()
+        self.points = utils.get4points(self.map.mapMatrix)
 
-        self.player = player.Player(map.Tank('./OriginalTank.png'))
-        playerTank = self.player.child
-        x, y = playerTank.m_x, playerTank.m_y
-        self.map.mapMatrix[x][y].append(playerTank)
-        map.gameLayer.append(playerTank.rect)
-        map.impassableLayer.append(playerTank.rect)
+        self.player = player.Player(None)
+        # playerTank = self.player.child
+        # x, y = playerTank.m_x, playerTank.m_y
+        # self.map.mapMatrix[x][y].append(playerTank)
+        # map.gameLayer.append(playerTank.rect)
+        # map.impassableLayer.append(playerTank.rect)
     
     @classmethod
     def getInstance(cls):
@@ -107,7 +122,17 @@ class Game:
         
         self.screen.fill(utils.BLACK)
 
-        for i in map.updateable:
+        if not self.player.child:
+            spawn = random.choice(map.playerSpawnPoints)
+
+            x, y = spawn.m_x, spawn.m_y
+            self.player.child = playerTank = map.Tank('tank.png', x, y)
+            self.map.mapMatrix[y][x].append(playerTank)
+
+            map.gameLayer.append(playerTank.rect)
+            map.impassableLayer.append(playerTank.rect)
+
+        for i in map.updatable:
             i.update()
         for i in map.drawable:
             self.screen.drawSprite(i)
@@ -117,10 +142,22 @@ class Game:
         self.player.update()
         self.player.child.update()
         self.screen.drawSprite(self.player.child)
+        
+        if self.points and self.player.changedPos:
+            to_visit = [self.player.child] + self.points
 
-        # sscale = utils.WINDOW_SCALE
-        # pygame.draw.circle(self.screen.getScreen(), (255, 0, 0), (round(self.player.child.x * scale) + utils.OFFSET_X + scale * utils.MAP_UNIT_SCALE/2,
-        #  round(self.player.child.y * scale) + utils.OFFSET_Y + scale * utils.MAP_UNIT_SCALE/2), 5 * scale, 3)
+            self.path = []
+
+            while len(to_visit) > 1:
+                item = to_visit.pop(0)
+                nearest = to_visit[0]
+                x, y = item.m_x, item.m_y
+                for p in to_visit:
+                    dist1 = abs(p.m_x - x) + abs(p.m_y - y)
+                    dist2 = abs(nearest.m_x - x) + abs(nearest.m_y - y)
+                    if dist1 < dist2:
+                        nearest = p
+                self.path += utils.starA((x, y), (nearest.m_x, nearest.m_y), self.map.mapMatrix)
 
         start = time.time()
         #path = utils.starA(self.player.child.getMatrixPos(), (4, 3), self.map.mapMatrix)
@@ -132,5 +169,5 @@ class Game:
             #print(avg)
         timelist.append(end-start)
         
-        #self.screen.drawLines(path)
+        self.screen.drawLines(self.path)
         self.screen.update()

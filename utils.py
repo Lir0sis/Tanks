@@ -1,8 +1,9 @@
 import pygame
+import game
 import math
 import map
 import queue
-
+import random
 WHITE = (255, 255, 255)
 ORANGE = (255, 150, 100)
 RED = (255, 0, 0)
@@ -79,10 +80,10 @@ def getCostlyNeighbors(item, mapMatrix):
         else:
             for obj in cell:
                 if isinstance(obj, map.Destroyable):
-                    neighbors.append((cost + 1/0.6, (cell_x, cell_y)))
+                    neighbors.append((cost + obj.weight, (cell_x, cell_y)))
                     break
                 elif not isinstance(obj, map.Impassable):
-                    neighbors.append((cost + 1, (cell_x, cell_y)))
+                    neighbors.append((cost + obj.weight, (cell_x, cell_y)))
                     break
     
     return neighbors
@@ -112,7 +113,7 @@ def getMazeNeighbours(cell, mapMatrix):
                 
     return neighbors
 
-def bfs(self, start_pos, end_pos):
+def bfs(self, start_pos, end_pos, matrix):
 
         nodes = {start_pos: None}
         to_visit = [start_pos]
@@ -121,7 +122,7 @@ def bfs(self, start_pos, end_pos):
             if pos == end_pos:
                 break
             else:
-                neighbors = self.getLegalNeighbours(pos)
+                neighbors = getLegalNeighbours(pos, matrix)
                 for neighbor in neighbors:
                     if neighbor not in nodes:
                         nodes[neighbor] = pos
@@ -179,6 +180,9 @@ def dfs(start_pos, end_pos, matrix):
     return path
 
 def starA(start_pos, end_pos, matrix):
+    if start_pos == end_pos:
+        return []
+
     x2, y2 = end_pos
 
     nodes = {start_pos: None}
@@ -232,8 +236,8 @@ def isReplacable(cell, mapMatrix):
             empty += dx + dy
         else:
             taken += dx + dy
-        
-        return True if abs(empty) < 2 and abs(taken) < 2 else False
+    #sign = empty/abs(empty) if empty != 0 else taken/abs(taken)
+    return True if abs(empty) < 1 and abs(taken) < 1 else False
 
 def getWallToBrake(direction, cell):
     x, y = cell
@@ -244,11 +248,10 @@ def make_maze():
     n = (MAZE_X - 1) * (MAZE_Y - 1) / 4
     mapMatrix = [[[map.Undestroyable((i, j), ORANGE)] 
         if i % 2 == 0 or j % 2 == 0 else [] for i in range(MAZE_X)] for j in range(MAZE_Y)]
-    cell = [1, 1]
+    cell = [15, 15]
     mapMatrix[cell[1]][cell[0]] = []
     to_visit = []
     
-    # Total number of visited cells during maze construction
     visited = 1
     while visited < n:
         neighbours = getMazeNeighbours(cell, mapMatrix)
@@ -256,8 +259,6 @@ def make_maze():
             cell = to_visit.pop()
             continue
 
-        import random
-        # Choose a random neighbouring cell and move to it.
         direction, next_cell = random.choice(neighbours)
         x, y = getWallToBrake(direction, cell)
         mapMatrix[y][x] = []
@@ -265,15 +266,45 @@ def make_maze():
         cell = next_cell
         visited += 1
 
+    while True:
+        x = round(random.random() * (MAZE_X - 2))
+        y = round(random.random() * (MAZE_Y - 2))
+
+        if mapMatrix[y][x] == []:
+            tile = map.SpawnPoint(False, (x, y))
+            mapMatrix[y][x].append(tile)
+            map.playerSpawnPoints.append(tile)
+            break
+
     for j, row in enumerate(mapMatrix):
         for i, column in enumerate(row):
             r = random.random() * 100
-            
-            if r > 40 and r < 55 and mapMatrix[j][i] != [] and \
+            if mapMatrix[j][i] == []:
+                continue
+
+            if r > 40 and r < 75 and isinstance(mapMatrix[j][i][0], map.Undestroyable) and \
+                1 <= i < MAZE_X - 1 and 1 <= j < MAZE_Y - 1 and \
                 isReplacable((i, j), mapMatrix):
 
                 mapMatrix[j][i] = [map.Destroyable((i, j), ORANGE)]
 
     return mapMatrix
 
-            
+def get4points(mapMatrix):
+    height = len(mapMatrix) - 2
+    width = len(mapMatrix[0]) - 2
+    points = []
+
+    while len(points) < 5:
+        x = round(random.random() * width)
+        y = round(random.random() * height)
+        if mapMatrix[y][x] == []:
+            tile = map.Point((x, y))
+            mapMatrix[y][x].append(tile)
+            points.append(tile)
+
+            map.drawable.append(tile)
+            map.gameLayer.append(tile.rect)
+
+    return points
+

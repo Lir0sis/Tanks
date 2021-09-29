@@ -1,21 +1,26 @@
 import pygame
 import copy
 import math
+
+from pygame import transform
 import utils
 import sys
 import game
 
-updateable = []
+updatable = []
 drawable = []
 gameLayer = []
 impassableLayer = []
+playerSpawnPoints = []
+enemySpawnPoints = []
 
 tiles = {
 #    'floor' : pygame.image.load('floor.png'),
     'destructible' : pygame.image.load('brick.png'),
     'undestructible' : pygame.image.load('iron.png'),
     'water' : pygame.image.load('water.png'),
-    'motherBase' : pygame.image.load('base.png')
+    'motherBase' : pygame.image.load('base.png'),
+    'coin' : pygame.image.load('coin.png')
 }
 
 class Transform:
@@ -74,13 +79,15 @@ class MyRect(pygame.Rect):
         self.parent = parent
 
 class Tile(Transform):
+    weight = 1
     def __init__(self, coords, image, parent, tileSize = 1) -> None:
         x, y = coords
         super().__init__(x, y)
         self.size = (1,1)
 
         # self.image = utils.createSimpleSprite(color, tileSize)
-        self.image = utils.copyImage(tileSize, image)
+        if image:
+            self.image = utils.copyImage(tileSize, image)
         self._createRect(tileSize, parent)
 
     def getSize(self):
@@ -101,15 +108,23 @@ class Tile(Transform):
             scale * size, scale * size)
         self.rect = MyRect(parent, newRect)
 
+class Point(Tile):
+    weight = 1
+    def __init__(self, coords) -> None:
+        super().__init__(coords, tiles['coin'], self)
+
+
 class Impassable():
     pass
 
 class Undestroyable(Tile, Impassable):
+    weight = 100
     def __init__(self, coords, image) -> None:
         super().__init__(coords, tiles['undestructible'], self)
     
 
 class Destroyable(Tile, Impassable):
+    weight = 1/0.33
     def __init__(self, coords, image) -> None:
         super().__init__(coords, tiles['destructible'], self)
 
@@ -122,10 +137,12 @@ class Destroyable(Tile, Impassable):
         drawable.remove(self)
 
 class Water(Tile, Impassable):
+    weight = 0
     def __init__(self, coords, image) -> None:
         super().__init__(coords, tiles['water'], self)
     
 class MotherBase(Tile, Impassable):
+    weight = 0
     def __init__(self, coords, image) -> None:
         super().__init__(coords, tiles['motherBase'], self, 3)
         
@@ -274,10 +291,11 @@ class ProjEmitter:
         map.mapMatrix[proj.m_y][proj.m_x].append(proj)
         
         gameLayer.append(proj)
-        updateable.append(proj)
+        updatable.append(proj)
         drawable.append(proj)
 
 class Projectile(Transform):
+    weight = 1.5
     def __init__(self, x, y, image, parent, direction):
         super().__init__(x, y, True)
         self.parent = parent
@@ -303,6 +321,8 @@ class Projectile(Transform):
         tileType = type(tile)
         if tileType is Undestroyable:
             pass
+        elif tileType is Point:
+            return
         elif tileType is Destroyable:
             tile.kill()
         elif tileType is Tank:
@@ -316,7 +336,7 @@ class Projectile(Transform):
         map = game.Game.getInstance().map
         map.mapMatrix[self.m_y][self.m_x].remove(self)
         drawable.remove(self)
-        updateable.remove(self)
+        updatable.remove(self)
         gameLayer.remove(self)
 
     def setImageFile(self, imagePath):
@@ -365,10 +385,10 @@ class Projectile(Transform):
 
             self.lifetime -= 1.0/utils.FPS
             
-class SpawnPoint:
+class SpawnPoint(Tile):
     def __init__(self, enemy, coords) -> None:
+        super().__init__(coords, None, self)
         self.enemy = enemy
-        self.x, self.y = coords
     
 class Map:
     def __init__(self, isMaze = True, mapfile = 'simple.lay', ):
@@ -377,9 +397,6 @@ class Map:
         # карта состоит из кубиков, 1 кубик 1/4 танка. 
         # Сам кубик, если может получать урон, то делиться еще на 4 мини-кубика
         # Выстрел каждый фрэйм проверяет касаеться ли он чего либо, при попадании удаляет ряд из 4х мини-кубиков
-
-        self.playerSpawnPoints = []
-        self.enemySpawnPoints = []
         
         self.isMaze = isMaze
         self._rawMap = open('./maps/' + mapfile, 'r').read()
@@ -412,9 +429,9 @@ class Map:
                         impassableLayer.append(tile.rect)
                         drawableList.append(tile)
                     elif isinstance(tile, SpawnPoint) and tile.enemy:
-                        self.enemySpawnPoints.append(tile)
+                        enemySpawnPoints.append(tile)
                     elif isinstance(tile, SpawnPoint) and not tile.enemy:
-                        self.playerSpawnPoints.append(tile)
+                        playerSpawnPoints.append(tile)
                     elif isinstance(tile, MotherBase):
                         gameLayer.append(tile.rect)
                         drawableList.append(tile)
