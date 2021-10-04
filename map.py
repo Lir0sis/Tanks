@@ -124,7 +124,7 @@ class Undestroyable(Tile, Impassable):
     
 
 class Destroyable(Tile, Impassable):
-    weight = 1/0.33
+    weight = 1/0.85
     def __init__(self, coords, image) -> None:
         super().__init__(coords, tiles['destructible'], self)
 

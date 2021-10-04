@@ -4,6 +4,7 @@ import math
 import map
 import queue
 import random
+
 WHITE = (255, 255, 255)
 ORANGE = (255, 150, 100)
 RED = (255, 0, 0)
@@ -19,8 +20,8 @@ MAP_UNIT_SCALE = 10
 WINDOW_SCALE = 1
 MATRIX_CENTER_BORDER = 0.45
 
-MAZE_X = 30 + 1
-MAZE_Y = 30 + 1
+MAZE_X = 100 + 1
+MAZE_Y = 70 + 1
 
 FPS = 120
 
@@ -66,7 +67,7 @@ def getLegalNeighbours(pos, mapMatrix):
                 
     return neighbors
 
-def getCostlyNeighbors(item, mapMatrix):
+def getCostlyNeighbors(item, mapMatrix, ignoreList):
     cost, pos = item
     x, y = pos
     neighbors = []
@@ -79,7 +80,9 @@ def getCostlyNeighbors(item, mapMatrix):
             neighbors.append((cost + 1, (cell_x, cell_y)))
         else:
             for obj in cell:
-                if isinstance(obj, map.Destroyable):
+                if obj in ignoreList:
+                    neighbors.append((cost + 1, (cell_x, cell_y)))
+                elif isinstance(obj, map.Destroyable):
                     neighbors.append((cost + obj.weight, (cell_x, cell_y)))
                     break
                 elif not isinstance(obj, map.Impassable):
@@ -179,7 +182,7 @@ def dfs(start_pos, end_pos, matrix):
     path.reverse()
     return path
 
-def starA(start_pos, end_pos, matrix):
+def starA(start_pos, end_pos, matrix, ignoreList):
     if start_pos == end_pos:
         return []
 
@@ -187,33 +190,42 @@ def starA(start_pos, end_pos, matrix):
 
     nodes = {start_pos: None}
     closedList = set()
-    openedList = {start_pos : [1, 0]}
-    to_visit = queue.PriorityQueue()
-    to_visit.put((0, start_pos))
+    openedList = [(start_pos,(1, 0))]
 
-    while not to_visit.empty():
-        _, pos = to_visit.get()
-        cost = openedList[pos][0]
+    while openedList:
+        pos, val = openedList.pop(0)
+        cost, _ = val 
+        # cost = openedList[pos][0]
+
         closedList.add(pos)
-        del openedList[pos]
+
         if pos == end_pos:
             break
         else:
-            for new_cost, next_pos in getCostlyNeighbors((cost, pos), matrix):
+            for new_cost, next_pos in getCostlyNeighbors((cost, pos), matrix, ignoreList):
                 x, y = next_pos
                 f = new_cost + abs(x2-x)**2 + abs(y2-y)**2
+
+                found = next(((x, i) for i, x in enumerate(closedList) if x[0] == next_pos), 0)
+                if found:
+                    new_item, i = found
+                    closedList.remove(next_pos)
+                    openedList[i] = new_item
+                    openedList.sort(key=lambda item: item[1][1])
+                    continue
 
                 if next_pos in closedList:
                     continue
 
                 nodes[next_pos] = pos
-
                 if next_pos in openedList and openedList[next_pos][0] <= new_cost:
                     continue
 
-                openedList[next_pos] = [new_cost, f]
-                to_visit.put((f, next_pos))
-    
+                openedList.append(((next_pos),(new_cost, f)))
+                openedList.sort(key=lambda item: item[1][1])
+                # to_visit.append((f, next_pos))
+                # to_visit.sort(key=lambda item: item[0])
+                
     path = []
     pos = end_pos
     #print(nodes)
@@ -248,7 +260,7 @@ def make_maze():
     n = (MAZE_X - 1) * (MAZE_Y - 1) / 4
     mapMatrix = [[[map.Undestroyable((i, j), ORANGE)] 
         if i % 2 == 0 or j % 2 == 0 else [] for i in range(MAZE_X)] for j in range(MAZE_Y)]
-    cell = [15, 15]
+    cell = [1, 1]
     mapMatrix[cell[1]][cell[0]] = []
     to_visit = []
     
@@ -290,12 +302,12 @@ def make_maze():
 
     return mapMatrix
 
-def get4points(mapMatrix):
+def getNpoints(mapMatrix, n):
     height = len(mapMatrix) - 2
     width = len(mapMatrix[0]) - 2
     points = []
 
-    while len(points) < 5:
+    while len(points) < n:
         x = round(random.random() * width)
         y = round(random.random() * height)
         if mapMatrix[y][x] == []:

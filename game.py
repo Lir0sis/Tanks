@@ -9,7 +9,7 @@ import time
 timelist = []
 
 class Screen:
-    def __init__(self, width = 640, height = 480):
+    def __init__(self, width = 1280, height = 720):
         self._width = width
         self._height = height
         self._screen = pygame.display.set_mode((width, height))
@@ -35,6 +35,22 @@ class Screen:
 
     def drawSprite(self, obj):
         self._screen.blit(obj.image, obj.rect)
+
+    def drawLinesByOne(self, vertices):
+        if not vertices:
+            return
+        start_pos = vertices[0]
+        scale = utils.WINDOW_SCALE * utils.MAP_UNIT_SCALE
+        offset = 0.5
+        for end_pos in vertices:
+            x, y = end_pos
+            x2, y2 = start_pos
+            pygame.draw.line(self._screen, utils.RED, 
+                ((x + offset) * scale + utils.OFFSET_X, (y + offset) * scale + utils.OFFSET_Y), 
+                ((x2 + offset) * scale + utils.OFFSET_X, (y2 + offset) * scale + utils.OFFSET_Y), width=1)
+            start_pos = end_pos
+
+            self.update()
 
     def drawLines(self, vertices):
         if not vertices:
@@ -98,7 +114,7 @@ class Game:
         self.screen.setOffset((boardWidth * utils.WINDOW_SCALE, boardHeight * utils.WINDOW_SCALE))
 
         self.map.init()
-        self.points = utils.get4points(self.map.mapMatrix)
+        self.points = utils.getNpoints(self.map.mapMatrix, 300)
 
         self.player = player.Player(None)
         # playerTank = self.player.child
@@ -142,22 +158,29 @@ class Game:
         self.player.update()
         self.player.child.update()
         self.screen.drawSprite(self.player.child)
-        
-        if self.points and self.player.changedPos:
-            to_visit = [self.player.child] + self.points
 
+        if self.points and self.player.changedPos:
+            to_visit = self.points.copy()
+            nearest = self.player.child
             self.path = []
 
-            while len(to_visit) > 1:
-                item = to_visit.pop(0)
+            while len(to_visit) > 0:
+                item = nearest
+                # r = round(random.random() * (len(to_visit) - 1))
                 nearest = to_visit[0]
                 x, y = item.m_x, item.m_y
                 for p in to_visit:
-                    dist1 = abs(p.m_x - x) + abs(p.m_y - y)
-                    dist2 = abs(nearest.m_x - x) + abs(nearest.m_y - y)
+                    dist1 = abs(p.m_x - x)**2 + abs(p.m_y - y)**2
+                    dist2 = abs(nearest.m_x - x)**2 + abs(nearest.m_y - y)**2
+                    
                     if dist1 < dist2:
                         nearest = p
-                self.path += utils.starA((x, y), (nearest.m_x, nearest.m_y), self.map.mapMatrix)
+                    # print((x, y), (nearest.m_x, nearest.m_y), ": ", dist1, dist2)
+                # print("path ", (x, y), (nearest.m_x, nearest.m_y))
+                # self.screen.draw(utils.starA((x, y), (nearest.m_x, nearest.m_y), self.map.mapMatrix))
+                to_visit.remove(nearest)
+               
+                self.path += utils.starA((x, y), (nearest.m_x, nearest.m_y), self.map.mapMatrix, [self.player.child])
 
         start = time.time()
         #path = utils.starA(self.player.child.getMatrixPos(), (4, 3), self.map.mapMatrix)
@@ -170,4 +193,5 @@ class Game:
         timelist.append(end-start)
         
         self.screen.drawLines(self.path)
+
         self.screen.update()
