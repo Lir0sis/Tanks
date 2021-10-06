@@ -20,8 +20,8 @@ MAP_UNIT_SCALE = 10
 WINDOW_SCALE = 1
 MATRIX_CENTER_BORDER = 0.45
 
-MAZE_X = 100 + 1
-MAZE_Y = 70 + 1
+MAZE_X = 36 + 1
+MAZE_Y = 30 + 1
 
 FPS = 120
 
@@ -53,7 +53,7 @@ def getMatrixCoord(coord):
     m_coord + 1 - MATRIX_CENTER_BORDER > coord / MAP_UNIT_SCALE:
         return m_coord
 
-def getLegalNeighbours(pos, mapMatrix):
+def getLegalNeighbours(pos, mapMatrix, ignoreList):
     x, y = pos
     neighbors = []
     for dx, dy in [[0, -1], [0, 1], [-1, 0], [1, 0]]:
@@ -62,18 +62,18 @@ def getLegalNeighbours(pos, mapMatrix):
             neighbors.append((dx + x, dy + y))
         else:
             for obj in cell:
-                if not isinstance(obj, map.Impassable):
+                if not isinstance(obj, map.Impassable) or obj in ignoreList:
                     neighbors.append((dx + x, dy + y))
                 
     return neighbors
 
-def getCostlyNeighbors(item, mapMatrix, ignoreList):
+def  getCostlyNeighbors(item, mapMatrix, ignoreList):
     cost, pos = item
     x, y = pos
     neighbors = []
     for dx, dy in [[0, -1], [0, 1], [-1, 0], [1, 0]]:
         cell_x, cell_y = x + dx, y + dy
-        if cell_x < 0 or cell_y < 0:
+        if cell_x < 0 or cell_x >= len(mapMatrix[0]) or cell_y < 0 or cell_y >= len(mapMatrix):
             continue
         cell = mapMatrix[cell_y][cell_x]
         if cell == []:
@@ -116,8 +116,7 @@ def getMazeNeighbours(cell, mapMatrix):
                 
     return neighbors
 
-def bfs(self, start_pos, end_pos, matrix):
-
+def bfs(start_pos, end_pos, matrix, ignoreList = []):
         nodes = {start_pos: None}
         to_visit = [start_pos]
         while to_visit:
@@ -125,7 +124,7 @@ def bfs(self, start_pos, end_pos, matrix):
             if pos == end_pos:
                 break
             else:
-                neighbors = getLegalNeighbours(pos, matrix)
+                neighbors = getLegalNeighbours(pos, matrix, ignoreList)
                 for neighbor in neighbors:
                     if neighbor not in nodes:
                         nodes[neighbor] = pos
@@ -139,7 +138,7 @@ def bfs(self, start_pos, end_pos, matrix):
 
         return path
 
-def uniformCostSearch(start_pos, end_pos, matrix):
+def uniformCostSearch(start_pos, end_pos, matrix, ignoreList = []):
     nodes = {start_pos: None}
     to_visit = queue.PriorityQueue()
     to_visit.put((1, start_pos))
@@ -149,7 +148,7 @@ def uniformCostSearch(start_pos, end_pos, matrix):
         if pos == end_pos:
             break
         else:
-            for cost, next_pos in getCostlyNeighbors(item, matrix):
+            for cost, next_pos in getCostlyNeighbors(item, matrix, ignoreList):
                 if next_pos not in nodes:
                     nodes[next_pos] = pos
                     to_visit.put((cost, next_pos))
@@ -161,7 +160,7 @@ def uniformCostSearch(start_pos, end_pos, matrix):
     path.reverse()
     return path
 
-def dfs(start_pos, end_pos, matrix):
+def dfs(start_pos, end_pos, matrix, ignoreList = []):
     nodes = {start_pos: None}
     to_visit = [start_pos]
     while to_visit:
@@ -169,7 +168,7 @@ def dfs(start_pos, end_pos, matrix):
         if pos == end_pos:
             break
         else:
-            neighbors = getLegalNeighbours(pos, matrix)
+            neighbors = getLegalNeighbours(pos, matrix, ignoreList)
             for neighbor in neighbors:
                 if neighbor not in nodes:
                     nodes[neighbor] = pos
@@ -185,7 +184,6 @@ def dfs(start_pos, end_pos, matrix):
 def starA(start_pos, end_pos, matrix, ignoreList):
     if start_pos == end_pos:
         return []
-
     x2, y2 = end_pos
 
     nodes = {start_pos: None}
@@ -195,17 +193,15 @@ def starA(start_pos, end_pos, matrix, ignoreList):
     while openedList:
         pos, val = openedList.pop(0)
         cost, _ = val 
-        # cost = openedList[pos][0]
 
         closedList.add(pos)
-
         if pos == end_pos:
             break
         else:
             for new_cost, next_pos in getCostlyNeighbors((cost, pos), matrix, ignoreList):
                 x, y = next_pos
-                f = new_cost + abs(x2-x)**2 + abs(y2-y)**2
-
+                f = new_cost + abs(x2-x) + abs(y2-y)
+                
                 found = next(((x, i) for i, x in enumerate(closedList) if x[0] == next_pos), 0)
                 if found:
                     new_item, i = found
@@ -223,12 +219,47 @@ def starA(start_pos, end_pos, matrix, ignoreList):
 
                 openedList.append(((next_pos),(new_cost, f)))
                 openedList.sort(key=lambda item: item[1][1])
-                # to_visit.append((f, next_pos))
-                # to_visit.sort(key=lambda item: item[0])
                 
     path = []
     pos = end_pos
-    #print(nodes)
+    while pos in nodes:
+        path.append(pos)
+        pos = nodes[pos]
+    path.reverse()
+    return path
+
+def greedy(start_pos, end_pos, matrix, ignoreList):
+    if start_pos == end_pos:
+        return []
+    x1, y1 = start_pos
+    x2, y2 = end_pos
+
+    nodes = {start_pos: None}
+    closedList = set()
+    openedList = [(start_pos,abs(x2-x1)**2 + abs(y2-y1)**2)]
+
+    while openedList:
+        pos, _ = openedList.pop(0)
+        closedList.add(pos)
+
+        if pos == end_pos:
+            break
+        else:
+            for _, next_pos in getCostlyNeighbors((0, pos), matrix, ignoreList):
+                f = abs(x2-next_pos[0])**2 + abs(y2-next_pos[1])**2
+
+                if next_pos in closedList:
+                    continue
+
+                nodes[next_pos] = pos   
+                if next_pos in openedList:
+                    continue
+
+                openedList.append(((next_pos),f))
+                openedList.sort(key=lambda item: item[1])
+                
+    path = []
+    pos = end_pos
     while pos in nodes:
         path.append(pos)
         pos = nodes[pos]
@@ -278,6 +309,11 @@ def make_maze():
         cell = next_cell
         visited += 1
 
+    mapMatrix = fill_maze(mapMatrix)
+
+    return mapMatrix
+
+def fill_maze(mapMatrix):
     while True:
         x = round(random.random() * (MAZE_X - 2))
         y = round(random.random() * (MAZE_Y - 2))
@@ -294,12 +330,11 @@ def make_maze():
             if mapMatrix[j][i] == []:
                 continue
 
-            if r > 40 and r < 75 and isinstance(mapMatrix[j][i][0], map.Undestroyable) and \
+            if r > 1 and r < 60 and isinstance(mapMatrix[j][i][0], map.Undestroyable) and \
                 1 <= i < MAZE_X - 1 and 1 <= j < MAZE_Y - 1 and \
                 isReplacable((i, j), mapMatrix):
 
                 mapMatrix[j][i] = [map.Destroyable((i, j), ORANGE)]
-
     return mapMatrix
 
 def getNpoints(mapMatrix, n):

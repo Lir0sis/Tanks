@@ -106,7 +106,7 @@ class Game:
     def __init__(self):
         self.clock = pygame.time.Clock()
         self.screen = Screen()
-        self.map = map.Map()
+        self.map = map.Map(False)
         self.path = []
 
         boardWidth, boardHeight = self.map._getBoardSize()
@@ -114,14 +114,9 @@ class Game:
         self.screen.setOffset((boardWidth * utils.WINDOW_SCALE, boardHeight * utils.WINDOW_SCALE))
 
         self.map.init()
-        self.points = utils.getNpoints(self.map.mapMatrix, 300)
+        self.points = utils.getNpoints(self.map.mapMatrix, 4)
 
         self.player = player.Player(None)
-        # playerTank = self.player.child
-        # x, y = playerTank.m_x, playerTank.m_y
-        # self.map.mapMatrix[x][y].append(playerTank)
-        # map.gameLayer.append(playerTank.rect)
-        # map.impassableLayer.append(playerTank.rect)
     
     @classmethod
     def getInstance(cls):
@@ -153,20 +148,20 @@ class Game:
         for i in map.drawable:
             self.screen.drawSprite(i)
 
-        utils.time += 1 / utils.FPS
+        utils.time = time.time()
 
         self.player.update()
         self.player.child.update()
         self.screen.drawSprite(self.player.child)
-
+    
         if self.points and self.player.changedPos:
             to_visit = self.points.copy()
             nearest = self.player.child
             self.path = []
 
+            start = time.time()
             while len(to_visit) > 0:
                 item = nearest
-                # r = round(random.random() * (len(to_visit) - 1))
                 nearest = to_visit[0]
                 x, y = item.m_x, item.m_y
                 for p in to_visit:
@@ -175,22 +170,23 @@ class Game:
                     
                     if dist1 < dist2:
                         nearest = p
-                    # print((x, y), (nearest.m_x, nearest.m_y), ": ", dist1, dist2)
-                # print("path ", (x, y), (nearest.m_x, nearest.m_y))
-                # self.screen.draw(utils.starA((x, y), (nearest.m_x, nearest.m_y), self.map.mapMatrix))
+
                 to_visit.remove(nearest)
                
                 self.path += utils.starA((x, y), (nearest.m_x, nearest.m_y), self.map.mapMatrix, [self.player.child])
+            end = time.time()
+            print(end - start)
 
-        start = time.time()
-        #path = utils.starA(self.player.child.getMatrixPos(), (4, 3), self.map.mapMatrix)
-        end = time.time()
-        if len(timelist) >= 30:
-            avg = sum(timelist) / len(timelist)
-            timelist.pop(0)
-            timelist[0] = avg
-            #print(avg)
-        timelist.append(end-start)
+        # start = time.time()
+        # path = utils.dfs(self.player.child.getMatrixPos(), (4, 3), self.map.mapMatrix)
+        # end = time.time()
+        # if len(timelist) >= 30:
+        #    avg = sum(timelist) / len(timelist)
+        #    timelist.pop(0)
+        #    timelist[0] = avg
+        #    print(avg)
+        #    self.screen.drawLines(path)
+        # timelist.append(end-start)
         
         self.screen.drawLines(self.path)
 

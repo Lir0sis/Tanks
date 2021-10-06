@@ -124,7 +124,7 @@ class Undestroyable(Tile, Impassable):
     
 
 class Destroyable(Tile, Impassable):
-    weight = 1/0.85
+    weight = 1/0.8
     def __init__(self, coords, image) -> None:
         super().__init__(coords, tiles['destructible'], self)
 
@@ -461,10 +461,10 @@ class Map:
                     self.mapMatrix[j].append([tile])
                 elif c == 'E':
                     tile = SpawnPoint(True,(i, j))
-                    self.mapMatrix[j].append([])
+                    self.mapMatrix[j].append([tile])
                 elif c == 'P':
                     tile = SpawnPoint(False,(i, j))
-                    self.mapMatrix[j].append([])
+                    self.mapMatrix[j].append([tile])
                 elif c == 'M':
                     tile = MotherBase((i - 1, j - 1), utils.GREY)
                     self.mapMatrix[j].append([tile])
