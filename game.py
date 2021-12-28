@@ -5,8 +5,15 @@ import map
 import utils
 import player
 import time
+import enemy
+import enum
 
 timelist = []
+
+class State(enum.Enum):
+    INPROCESS = 0
+    WON = 1
+    LOST = 2
 
 class Screen:
     def __init__(self, width = 1280, height = 720):
@@ -104,25 +111,41 @@ class Game:
     __instance = None
    
     def __init__(self):
+        self.state = State.INPROCESS
         self.clock = pygame.time.Clock()
         self.screen = Screen()
         self.map = map.Map(False)
-        self.path = []
+        # self.path = []
+        self.enemies = [enemy.RandomEnemy(None, 2 + 1), enemy.StarAEnemy(None, 200 + 1)]
 
         boardWidth, boardHeight = self.map._getBoardSize()
         utils.WINDOW_SCALE = self.screen.getScale((boardWidth, boardHeight))
         self.screen.setOffset((boardWidth * utils.WINDOW_SCALE, boardHeight * utils.WINDOW_SCALE))
 
         self.map.init()
-        self.points = utils.getNpoints(self.map.mapMatrix, 4)
+        self.points = None # utils.getNpoints(self.map.mapMatrix, 4)
 
-        self.player = player.Player(None)
+        self.players = [player.Player(None, 10 + 1)]#[player.MinMaxAssisted(None, 999 + 1)]
     
     @classmethod
     def getInstance(cls):
         if not cls.__instance:
             cls.__instance = Game()
         return cls.__instance
+
+    def spawnPlayer(self, player, spawnPoins):
+        lives = player.lives - 1
+        if lives <= 0:
+            return False
+        
+        spawn = random.choice(spawnPoins)
+        x, y = spawn.m_x, spawn.m_y
+        
+        playerTank = map.Tank('tank.png', x * utils.MAP_UNIT_SCALE, 
+            y * utils.MAP_UNIT_SCALE)
+        player.__init__(playerTank, lives)
+        self.map.mapMatrix[y][x].append(playerTank)
+        return True
 
     def run(self):
         for i in pygame.event.get():
@@ -133,26 +156,43 @@ class Game:
         
         self.screen.fill(utils.BLACK)
 
-        if not self.player.child:
-            spawn = random.choice(map.playerSpawnPoints)
+        players_to_remove = []
+        for player in self.players:
+            if not player.child:
+                if not self.spawnPlayer(player, map.playerSpawnPoints):
+                   players_to_remove.append(player)
+        [self.players.remove(p) for p in players_to_remove]
+        
+        enemies_to_remove = []
+        for player in self.enemies:
+            if not player.child:
+                if not self.spawnPlayer(player, map.enemySpawnPoints):
+                    enemies_to_remove.append(player)
+        [self.enemies.remove(p) for p in enemies_to_remove]
 
-            x, y = spawn.m_x, spawn.m_y
-            self.player.child = playerTank = map.Tank('tank.png', x, y)
-            self.map.mapMatrix[y][x].append(playerTank)
-
-            map.gameLayer.append(playerTank.rect)
-            map.impassableLayer.append(playerTank.rect)
+        if len(self.enemies) == 0:
+            self.state = State.WON
+            return
+        elif len(self.players) == 0:
+            self.state = State.LOST
+            return
 
         for i in map.updatable:
             i.update()
         for i in map.drawable:
             self.screen.drawSprite(i)
 
-        utils.time = time.time()
+        currTime = time.time()
+        utils.deltaTime = currTime - utils.time
+        utils.time = currTime
 
-        self.player.update()
-        self.player.child.update()
-        self.screen.drawSprite(self.player.child)
+        for player in self.players + self.enemies:
+            player.update()
+            if player.child.rect == None:
+                player.child = None
+                continue
+            player.child.update()
+            self.screen.drawSprite(player.child)
     
         if self.points and self.player.changedPos:
             to_visit = self.points.copy()
@@ -175,7 +215,7 @@ class Game:
                
                 self.path += utils.starA((x, y), (nearest.m_x, nearest.m_y), self.map.mapMatrix, [self.player.child])
             end = time.time()
-            print(end - start)
+            # print(end - start)
 
         # start = time.time()
         # path = utils.dfs(self.player.child.getMatrixPos(), (4, 3), self.map.mapMatrix)
@@ -188,6 +228,6 @@ class Game:
         #    self.screen.drawLines(path)
         # timelist.append(end-start)
         
-        self.screen.drawLines(self.path)
+        # self.screen.drawLines(self.path)
 
         self.screen.update()

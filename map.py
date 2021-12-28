@@ -1,6 +1,10 @@
 import pygame
 import copy
 import math
+import copy
+import enum
+
+from states import States
 
 from pygame import transform
 import utils
@@ -56,13 +60,9 @@ class Transform:
         self.x, self.y = x, y
 
         nm_x, nm_y = utils.getMatrixCoord(x), utils.getMatrixCoord(y)
-        # print('----')
-        # print(nm_x, nm_y)
-        # print(self.m_x, self.m_y)
+
         if nm_x != self.m_x or nm_y != self.m_y:
             map = game.Game.getInstance().map
-            # print(map.mapMatrix[self.m_y][self.m_x])
-            # print(map.mapMatrix[nm_y][nm_x])
             map.mapMatrix[self.m_y][self.m_x].remove(self)
             map.mapMatrix[nm_y][nm_x].append(self)
 
@@ -70,7 +70,7 @@ class Transform:
         self.m_y = nm_y
 
 class MyRect(pygame.Rect):
-    def __init__(self, parent, tileect = None,sizes = None):
+    def __init__(self, parent, tileect = None, sizes = None):
         if tileect is None and sizes is not None:
             left, top, width, height = sizes
             super().__init__((left, top), (width, height))
@@ -85,7 +85,6 @@ class Tile(Transform):
         super().__init__(x, y)
         self.size = (1,1)
 
-        # self.image = utils.createSimpleSprite(color, tileSize)
         if image:
             self.image = utils.copyImage(tileSize, image)
         self._createRect(tileSize, parent)
@@ -151,13 +150,13 @@ class MotherBase(Tile, Impassable):
         map.mapMatrix[self.m_y][self.m_x].remove(self)
         gameLayer.remove(self.rect)
         drawable.remove(self)
-        impassableLayer.remove(self)
+        #impassableLayer.remove(self)
         # # print('you\'ve lost')
         sys.exit()
 
 class Tank(Transform, Impassable):
     def __init__(self, image, x = 10, y = 10):
-        super().__init__(x, y)
+        super().__init__(x, y, True)
         self.fireProj = ProjEmitter(Projectile, './bullet.png', self)
         self.image = pygame.transform.rotate(pygame.image.load(image), -90)
         self.rect = MyRect(self, self.image.get_rect())
@@ -166,8 +165,8 @@ class Tank(Transform, Impassable):
 
         self.direction = [0.0, -1.0]
         self.velocity = [0.0, 0.0]
-        self.speed = 4
-        self.firerate = 0.75
+        self.speed = 4 * utils.MAP_UNIT_SCALE
+        self.firerate = 0.33
         self.timeUntilShot = 0.0
 
     def __eq__(self, other):
@@ -176,21 +175,26 @@ class Tank(Transform, Impassable):
     def kill(self):
         map = game.Game.getInstance().map
         map.mapMatrix[self.m_y][self.m_x].remove(self)
-        gameLayer.remove(self)
-        impassableLayer.remove(self)
+        impassableLayer.remove(self.rect)
+        gameLayer.remove(self.rect)
+        self.rect = None
+        self.image = None
 
-    def action(self):
+    def action(self, ignorelist = []):
         if self.timeUntilShot < utils.time:
             self.timeUntilShot = utils.time + self.firerate
-            self.fireProj.emit(self.direction)
-
-    def setDirection(self, vec, keypressed):
-        self.direction = vec
-        if keypressed:
-            self.velocity = [vec[0] * self.speed * utils.MAP_UNIT_SCALE,
-             vec[1] * self.speed * utils.MAP_UNIT_SCALE]
+            self.fireProj.emit(self.direction, ignorelist)
         else:
-            self.velocity = [0, 0]
+            return False
+        return True
+
+    def setDirection(self, vec, isMoving):
+        self.direction = (vec[0]/abs(vec[0]) if vec[0] != 0 else 0.0, vec[1]/abs(vec[1]) if vec[1] != 0 else 0.0)
+        if isMoving:
+            self.velocity = (vec[0] * self.speed,
+             vec[1] * self.speed)
+        else:
+            self.velocity = (0, 0)
 
     def getCenterPos(self):
         # width, height = self.size
@@ -208,6 +212,8 @@ class Tank(Transform, Impassable):
             scale = utils.WINDOW_SCALE * utils.MAP_UNIT_SCALE
             self.image = pygame.transform.smoothscale(self.image, (round(scale * self.size[0]), round(scale * self.size[1])))
         self.rect = MyRect(self, self.image.get_rect())
+        gameLayer.append(self.rect)
+        impassableLayer.append(self.rect)
 
     def rotate(self):
         vel = self.velocity
@@ -224,7 +230,8 @@ class Tank(Transform, Impassable):
         rot = self.rot - rot
 
         self.image = pygame.transform.rotate(self.image, rot)
-        self.rect = MyRect(self, self.image.get_rect())
+        self.rect.height = self.image.get_height()
+        self.rect.width = self.image.get_width()
 
     def onCollide(self, collider):
         if collider.parent == self:
@@ -238,9 +245,9 @@ class Tank(Transform, Impassable):
         w2, h2 = tile.getSize()
         
         # print(x1, x2)
-        diffx = x1-x2 - self.velocity[0] * 1/utils.FPS
-        diffy = y1-y2 - self.velocity[1] * 1/utils.FPS
-        print(diffx, diffy)
+        diffx = x1-x2 - self.velocity[0] * 1 /utils.FPS# * utils.deltaTime
+        diffy = y1-y2 - self.velocity[1] * 1 /utils.FPS# * utils.deltaTime
+        # print(diffx, diffy)
         signx = diffx/abs(diffx) if diffx else 0
         signy = diffy/abs(diffy) if diffy else 0
 
@@ -268,9 +275,9 @@ class Tank(Transform, Impassable):
         if indx != -1:
             self.onCollide(impassableLayer[indx])
 
-        self.setPos(self.x + vel[0] / utils.FPS, self.y + vel[1] / utils.FPS)
-        self.rect.topleft = [round(self.x * utils.WINDOW_SCALE) + utils.OFFSET_X, 
-             round(self.y * utils.WINDOW_SCALE) + utils.OFFSET_Y]
+        self.setPos(self.x + vel[0] * 1/utils.FPS, self.y + vel[1] * 1/ utils.FPS)
+        self.rect.topleft = (round(self.x * utils.WINDOW_SCALE) + utils.OFFSET_X, 
+             round(self.y * utils.WINDOW_SCALE) + utils.OFFSET_Y)
     
 
 class ProjEmitter:
@@ -279,18 +286,18 @@ class ProjEmitter:
         self.image = pygame.image.load(imagePath)
         self.parent = parent
 
-    def emit(self, direction):
+    def emit(self, direction, ignoreList):
         x, y, rot = self.parent.getPosRot()
         proj = self.proj(x, y, self.image.copy(), self.parent, direction)
         # x, y = self.parent.getCenterPos()
         # rot = self.parent.getRot()
         proj.resize(None)
         proj.setPosRot(x, y, rot - 90)
-
+        proj.ignoreList = ignoreList
         map = game.Game.getInstance().map
         map.mapMatrix[proj.m_y][proj.m_x].append(proj)
         
-        gameLayer.append(proj)
+        gameLayer.append(proj.rect)
         updatable.append(proj)
         drawable.append(proj)
 
@@ -300,11 +307,12 @@ class Projectile(Transform):
         super().__init__(x, y, True)
         self.parent = parent
         self.direction = direction
+        self.ignoreList = None
 
-        self.lifetime = 0.6
         self.damage = 1
         self.penetration = 1
-        self.speed = 30
+        self.speed = 16 * utils.MAP_UNIT_SCALE
+        self.lifetime = 1 / self.speed * (utils.MAP_UNIT_SCALE * 5.5)
         self.size = (0.5, 0.75)
         
         self.enabled = True
@@ -315,20 +323,19 @@ class Projectile(Transform):
         return id(self) == id(other)
 
     def onCollide(self, collider):
-        tile = collider.parent
-        if tile == self.parent:
+        obj = collider.parent
+        if obj == self.parent or obj == self:
             return
-        tileType = type(tile)
-        if tileType is Undestroyable:
+        elif obj in self.ignoreList:
             pass
-        elif tileType is Point:
-            return
-        elif tileType is Destroyable:
-            tile.kill()
-        elif tileType is Tank:
-            tile.kill()
-        elif tileType is MotherBase:
-            tile.kill()
+        else:
+            objType = type(obj)
+            if objType is Undestroyable:
+                pass
+            elif objType is Point:
+                return
+            else:
+                obj.kill()
         self.kill()
         return True
 
@@ -337,7 +344,7 @@ class Projectile(Transform):
         map.mapMatrix[self.m_y][self.m_x].remove(self)
         drawable.remove(self)
         updatable.remove(self)
-        gameLayer.remove(self)
+        gameLayer.remove(self.rect)
 
     def setImageFile(self, imagePath):
         self.image = pygame.image.load(imagePath)
@@ -372,18 +379,18 @@ class Projectile(Transform):
                 self.kill()
                 return
 
+            self.setPos(self.x + self.direction[0] * self.speed * utils.deltaTime, 
+                 self.y + self.direction[1] * self.speed * utils.deltaTime )
+
+            self.rect.center = [round(self.x * utils.WINDOW_SCALE) + utils.OFFSET_X,
+                 round(self.y * utils.WINDOW_SCALE) + utils.OFFSET_Y]
+
             indx = self.rect.collidelist(gameLayer)
             if indx != -1:
                 if self.onCollide(gameLayer[indx]):
                     return
 
-            self.setPos(self.x + self.direction[0] * self.speed * utils.MAP_UNIT_SCALE / utils.FPS, 
-                 self.y + self.direction[1] * self.speed * utils.MAP_UNIT_SCALE / utils.FPS)
-
-            self.rect.center = [round(self.x * utils.WINDOW_SCALE) + utils.OFFSET_X,
-                 round(self.y * utils.WINDOW_SCALE) + utils.OFFSET_Y]
-
-            self.lifetime -= 1.0/utils.FPS
+            self.lifetime -= utils.deltaTime
             
 class SpawnPoint(Tile):
     def __init__(self, enemy, coords) -> None:
@@ -391,16 +398,15 @@ class SpawnPoint(Tile):
         self.enemy = enemy
     
 class Map:
-    def __init__(self, isMaze = True, mapfile = 'simple.lay', ):
-        
-        # TODO 
-        # карта состоит из кубиков, 1 кубик 1/4 танка. 
-        # Сам кубик, если может получать урон, то делиться еще на 4 мини-кубика
-        # Выстрел каждый фрэйм проверяет касаеться ли он чего либо, при попадании удаляет ряд из 4х мини-кубиков
-        
+    def __init__(self, isMaze = True, mapfile = 'simple.lay' ):
         self.isMaze = isMaze
         self._rawMap = open('./maps/' + mapfile, 'r').read()
         self.mapMatrix = []
+
+    def getSimple(self):
+        gameInst = game.Game.getInstance()
+
+        return States.SimpleMap(self.mapMatrix, gameInst.players, gameInst.enemies)
 
     def _getBoardSize(self):
         scale = utils.MAP_UNIT_SCALE
@@ -466,7 +472,7 @@ class Map:
                     tile = SpawnPoint(False,(i, j))
                     self.mapMatrix[j].append([tile])
                 elif c == 'M':
-                    tile = MotherBase((i - 1, j - 1), utils.GREY)
+                    tile = MotherBase((i, j), utils.GREY)
                     self.mapMatrix[j].append([tile])
 
         self._initLayers()

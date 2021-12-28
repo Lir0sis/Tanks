@@ -4,6 +4,7 @@ import math
 import map
 import queue
 import random
+import time
 
 WHITE = (255, 255, 255)
 ORANGE = (255, 150, 100)
@@ -18,14 +19,15 @@ OFFSET_Y = 0
 OFFSET_X = 0
 MAP_UNIT_SCALE = 10
 WINDOW_SCALE = 1
-MATRIX_CENTER_BORDER = 0.45
+CELL_CENTER_TRESH = 0.42
 
 MAZE_X = 36 + 1
 MAZE_Y = 30 + 1
 
 FPS = 120
 
-time = 0.0
+time = time.time()
+deltaTime = 0.0
 
 def createSimpleSprite(color, tileScale):
     width = MAP_UNIT_SCALE * WINDOW_SCALE * tileScale
@@ -48,10 +50,18 @@ def screenScaleXY(xy):
 
 
 def getMatrixCoord(coord):
-    m_coord = round(coord / MAP_UNIT_SCALE)
-    if m_coord + MATRIX_CENTER_BORDER < coord / MAP_UNIT_SCALE or \
-    m_coord + 1 - MATRIX_CENTER_BORDER > coord / MAP_UNIT_SCALE:
+    fm_coord = coord / MAP_UNIT_SCALE
+    m_coord = math.floor(fm_coord)
+    return m_coord
+
+def getCenteredMatrixCoord(coord, treshold = CELL_CENTER_TRESH):
+    fm_coord = coord / MAP_UNIT_SCALE
+    m_coord = math.floor(fm_coord)
+    if m_coord + treshold < fm_coord and \
+        m_coord + 1 - treshold > fm_coord:
         return m_coord
+    else:
+        return None
 
 def getLegalNeighbours(pos, mapMatrix, ignoreList):
     x, y = pos
@@ -67,7 +77,7 @@ def getLegalNeighbours(pos, mapMatrix, ignoreList):
                 
     return neighbors
 
-def  getCostlyNeighbors(item, mapMatrix, ignoreList):
+def getCostlyNeighbors(item, mapMatrix, ignoreList):
     cost, pos = item
     x, y = pos
     neighbors = []
@@ -78,6 +88,11 @@ def  getCostlyNeighbors(item, mapMatrix, ignoreList):
         cell = mapMatrix[cell_y][cell_x]
         if cell == []:
             neighbors.append((cost + 1, (cell_x, cell_y)))
+        elif cell != []:
+            if cell == None:
+                neighbors.append((cost + 1, (cell_x, cell_y)))
+            if isinstance(cell, map.Destroyable):
+                neighbors.append((cost + cell.weight, (cell_x, cell_y)))
         else:
             for obj in cell:
                 if obj in ignoreList:
@@ -181,7 +196,10 @@ def dfs(start_pos, end_pos, matrix, ignoreList = []):
     path.reverse()
     return path
 
-def starA(start_pos, end_pos, matrix, ignoreList):
+def starA(start_pos, end_pos, matrix, ignoreList = []):
+    start_pos = tuple(start_pos)
+    end_pos = tuple(end_pos)
+
     if start_pos == end_pos:
         return []
     x2, y2 = end_pos
@@ -355,3 +373,81 @@ def getNpoints(mapMatrix, n):
 
     return points
 
+
+def miniMax(maxDepth, game):
+        
+            nextMove = None
+
+            simple_board = game.map.getSimple()
+
+            def maximize(alpha, beta, board, depth):
+            
+                if depth == 0:
+                    return board.getScore() # TODO
+    
+                actions = board.getActions(0) # TODO
+                best = -999.0
+                score = None
+                for shoot, move in actions:
+                    new_board = board.clone()
+                    result = None
+
+                    if shoot:
+                        new_board.applyAction(0, (True, shoot))
+                    if move:
+                        result = new_board.applyAction(0, (False, move))
+                    if result:
+                        score = result
+                    else:
+                        score = minimize(alpha, beta, 0, new_board, depth - 1)
+
+                    best = max(score, best)
+                    alpha = max(alpha, best)
+
+                    if depth == maxDepth and alpha == score:
+                        nextMove = (shoot, move)
+ 
+                    if alpha >= beta:
+                        return alpha
+                
+                return best
+            
+
+            def minimize(alpha, beta, enemy, board, depth):
+            
+                if (depth == 0):
+                    return board.getScore()
+
+                actions = board.getActions(enemy)
+                best = 999.0
+                score = None
+                for action in actions:
+                    new_board = board.clone()
+                    val1, val2 = None, None
+                    if action[0]:
+                        new_board.applyAction(enemy + 1, (True, action[0]))
+                    if action[1]:
+                        val1 = new_board.applyAction(enemy + 1, (False, action[1]))
+
+                    if not val1 and (enemy + 1 < len(new_board.enemies)):
+                        val2 = minimize(alpha, beta, enemy + 1, new_board, depth)
+                    # if action2[0]:
+                    #     new_board.applyAction(1, (True, action2[0]))
+                    # if action2[1]:
+                    #     val2 = new_board.applyAction(1, (False, action2[1]))
+                        score = min(i for i in [val1, val2] if i is not None)
+                    else:    
+                        score = maximize(alpha, beta, new_board, depth - 1)
+                    best = min(score, best)
+                    beta = min(beta, best)
+                    if alpha >= beta:
+                        return beta
+                
+
+                return best
+            
+
+            maximize(-999.0, 999.0, simple_board, maxDepth)
+
+            return nextMove
+        
