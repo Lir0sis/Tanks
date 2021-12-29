@@ -15,8 +15,9 @@ class State(enum.Enum):
     WON = 1
     LOST = 2
 
+
 class Screen:
-    def __init__(self, width = 1280, height = 720):
+    def __init__(self, width = 680, height = 680):
         self._width = width
         self._height = height
         self._screen = pygame.display.set_mode((width, height))
@@ -114,18 +115,18 @@ class Game:
         self.state = State.INPROCESS
         self.clock = pygame.time.Clock()
         self.screen = Screen()
-        self.map = map.Map(False)
+        self.map = map.Map(False, 'q-learn.lay')
         # self.path = []
-        self.enemies = [enemy.RandomEnemy(None, 2 + 1), enemy.StarAEnemy(None, 200 + 1)]
+        self.enemies = [enemy.StarAEnemy(None, 10000 + 1)]
 
         boardWidth, boardHeight = self.map._getBoardSize()
         utils.WINDOW_SCALE = self.screen.getScale((boardWidth, boardHeight))
         self.screen.setOffset((boardWidth * utils.WINDOW_SCALE, boardHeight * utils.WINDOW_SCALE))
-
+        
         self.map.init()
+        self.lastState = None
         self.points = None # utils.getNpoints(self.map.mapMatrix, 4)
-
-        self.players = [player.Player(None, 10 + 1)]#[player.MinMaxAssisted(None, 999 + 1)]
+        self.players = [player.QLearn(None, 1000 + 1)]#[player.MinMaxAssisted(None, 999 + 1)]
     
     @classmethod
     def getInstance(cls):
@@ -147,6 +148,13 @@ class Game:
         self.map.mapMatrix[y][x].append(playerTank)
         return True
 
+    def getPlayerIndex(self, player):
+        return (self.players + self.enemies).index(player)
+
+    def removeChild(self, player):
+        if (player.child != None):
+            player.child.rect = None
+
     def run(self):
         for i in pygame.event.get():
             if i.type == pygame.QUIT:
@@ -155,20 +163,28 @@ class Game:
         self.clock.tick(utils.FPS)
         
         self.screen.fill(utils.BLACK)
+        
+        print(issubclass(type(map.Destroyable((0,0), 'coin')), map.Tile))
+
+        if(self.state == State.WON or self.state == State.LOST) and not self.players[0].stopTraining():
+            self.players[0].final(self.lastState[0])
+            self.enemies[0].lives = 2
+            self.players[0].lives = 2
 
         players_to_remove = []
         for player in self.players:
             if not player.child:
                 if not self.spawnPlayer(player, map.playerSpawnPoints):
                    players_to_remove.append(player)
-        [self.players.remove(p) for p in players_to_remove]
+                   #self.lastState = self.map.getSimple()
+        [self.removeChild(p) for p in players_to_remove]
         
         enemies_to_remove = []
         for player in self.enemies:
             if not player.child:
                 if not self.spawnPlayer(player, map.enemySpawnPoints):
                     enemies_to_remove.append(player)
-        [self.enemies.remove(p) for p in enemies_to_remove]
+        [self.removeChild(p) for p in enemies_to_remove]
 
         if len(self.enemies) == 0:
             self.state = State.WON
@@ -188,11 +204,12 @@ class Game:
 
         for player in self.players + self.enemies:
             player.update()
-            if player.child.rect == None:
-                player.child = None
-                continue
-            player.child.update()
-            self.screen.drawSprite(player.child)
+            if player.child:
+                if player.child.rect == None:
+                    player.child = None
+                    continue
+                player.child.update()
+                self.screen.drawSprite(player.child)
     
         if self.points and self.player.changedPos:
             to_visit = self.points.copy()

@@ -15,6 +15,7 @@ GREY = (100, 100, 100)
 BLACK = (0, 0, 0)
 
 
+
 OFFSET_Y = 0
 OFFSET_X = 0
 MAP_UNIT_SCALE = 10
@@ -28,6 +29,11 @@ FPS = 120
 
 time = time.time()
 deltaTime = 0.0
+
+class Counter(dict):
+    def __getitem__(self, idx):
+        self.setdefault(idx, 0)
+        return dict.__getitem__(self, idx)
 
 def createSimpleSprite(color, tileScale):
     width = MAP_UNIT_SCALE * WINDOW_SCALE * tileScale
@@ -236,11 +242,13 @@ def starA(start_pos, end_pos, matrix, ignoreList = []):
                     continue
 
                 openedList.append(((next_pos),(new_cost, f)))
-                openedList.sort(key=lambda item: item[1][1])
+                #if(len(openedList) > 1):
+                openedList.sort(key= lambda item: item[1][1])
+                
                 
     path = []
     pos = end_pos
-    while pos in nodes:
+    while pos in nodes.keys():
         path.append(pos)
         pos = nodes[pos]
     path.reverse()
@@ -375,17 +383,14 @@ def getNpoints(mapMatrix, n):
 
 
 def miniMax(maxDepth, game):
-        
             nextMove = None
-
             simple_board = game.map.getSimple()
 
             def maximize(alpha, beta, board, depth):
-            
                 if depth == 0:
-                    return board.getScore() # TODO
+                    return board.getScore() 
     
-                actions = board.getActions(0) # TODO
+                actions = board.getActions(0) 
                 best = -999.0
                 score = None
                 for shoot, move in actions:
@@ -408,13 +413,10 @@ def miniMax(maxDepth, game):
                         nextMove = (shoot, move)
  
                     if alpha >= beta:
-                        return alpha
-                
+                        return alpha    
                 return best
             
-
             def minimize(alpha, beta, enemy, board, depth):
-            
                 if (depth == 0):
                     return board.getScore()
 
@@ -431,10 +433,6 @@ def miniMax(maxDepth, game):
 
                     if not val1 and (enemy + 1 < len(new_board.enemies)):
                         val2 = minimize(alpha, beta, enemy + 1, new_board, depth)
-                    # if action2[0]:
-                    #     new_board.applyAction(1, (True, action2[0]))
-                    # if action2[1]:
-                    #     val2 = new_board.applyAction(1, (False, action2[1]))
                         score = min(i for i in [val1, val2] if i is not None)
                     else:    
                         score = maximize(alpha, beta, new_board, depth - 1)
@@ -442,12 +440,8 @@ def miniMax(maxDepth, game):
                     beta = min(beta, best)
                     if alpha >= beta:
                         return beta
-                
-
                 return best
-            
 
             maximize(-999.0, 999.0, simple_board, maxDepth)
-
             return nextMove
         

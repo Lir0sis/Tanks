@@ -19,6 +19,7 @@ result = model.predict(test_x)
 
 input = np.array([0, 0, 1, 0, 1, 0, 0, 1]).reshape(-1, 1)
 
+
 prediction = model.predict(input)
 prediction_prob = model.predict_proba(input)
 

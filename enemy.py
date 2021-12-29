@@ -17,6 +17,8 @@ class RandomEnemy:
         self.changedPos = True
         self.game = None 
 
+
+
     def update(self):
         if not self.child:
             return
@@ -73,12 +75,14 @@ class StarAEnemy:
         self.oponents = None
         self.lives = lives
         self.child = child
-        self.direction = [0.0, -1.0]
+        self.direction = (0.0, -1.0)
         self.changedPos = True
         # self.m_posNext = [0, 0]
         self.path = None
         if child:
             self.prevPos = [child.m_x, child.m_y]
+        self.currentMove = (0, 0)
+        self.nextMove = (0, 0)
         self.game = None
         
     def update(self):
@@ -90,33 +94,34 @@ class StarAEnemy:
             self.oponents = self.game.players
             self.frendlies = [f.child for f in self.game.enemies]
 
-        isMoving = True
+        isMoving = self.currentMove != None
 
-        if self.path == None and (any([o.changedPos for o in self.oponents])) and \
-        (self.path == None):
+        if self.changedPos or any([o.changedPos for o in self.oponents]):
             self.path = utils.starA(
                 (self.child.m_x, self.child.m_y), 
                 (self.oponents[0].child.m_x, self.oponents[0].child.m_y),
                 self.game.map.mapMatrix, self.frendlies + [self.oponents[0].child])
-            self.changedPos = True
- 
-        if self.path != None and self.changedPos:
-            if len(self.path) < 2:
-                self.path = None
-                isMoving = False
-            else:
-                self.path = self.path[1:]
-                self.direction = [
+            self.path = self.path[1:]
+            if(len(self.path) >= 1):
+                self.nextMove = (
                     self.path[0][0] - self.prevPos[0], 
-                    self.path[0][1] - self.prevPos[1]]
- 
+                    self.path[0][1] - self.prevPos[1])
+            
+        if(not self.currentMove):
+            if(self.nextMove):
+                self.currentMove = self.nextMove
+
+        self.direction = self.currentMove
+
         self.child.setDirection(self.direction, isMoving)
         self.child.action()
-        x, y = utils.getCenteredMatrixCoord(self.child.x + utils.MAP_UNIT_SCALE/2, 0.48), \
-            utils.getCenteredMatrixCoord(self.child.y + utils.MAP_UNIT_SCALE/2, 0.48)
+        #self.game.state.queueAction()
+        x, y = utils.getCenteredMatrixCoord(self.child.x + utils.MAP_UNIT_SCALE/2, 0.45), \
+            utils.getCenteredMatrixCoord(self.child.y + utils.MAP_UNIT_SCALE/2, 0.45)
 
         if self.prevPos != [x, y] and x != None and y != None:
             self.changedPos = True
             self.prevPos = [x, y]
+            self.currentMove = None
         else:
             self.changedPos = False
